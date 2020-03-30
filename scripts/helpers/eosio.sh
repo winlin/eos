@@ -253,8 +253,14 @@ function ensure-boost() {
         elif $PIN_COMPILER; then
             local SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
         fi
+        BOOST_VERSION="1_72_0"
+        BOOST_VERSION_MAJOR=1
+        BOOST_VERSION_MINOR=72
+        BOOST_VERSION_PATCH=0
+        export BOOST_ROOT=${BOOST_LOCATION:-${SRC_DIR}/boost_${BOOST_VERSION}}
+        #curl -LO https://dl.bintray.com/boostorg/release/$BOOST_VERSION_MAJOR.$BOOST_VERSION_MINOR.$BOOST_VERSION_PATCH/source/boost_$BOOST_VERSION.tar.bz2 \
         execute bash -c "cd $SRC_DIR && \
-        curl -LO https://dl.bintray.com/boostorg/release/$BOOST_VERSION_MAJOR.$BOOST_VERSION_MINOR.$BOOST_VERSION_PATCH/source/boost_$BOOST_VERSION.tar.bz2 \
+        curl -LO https://nchc.dl.sourceforge.net/project/boost/boost/1.72.0/boost_1_72_0.tar.bz2 \
         && tar -xjf boost_$BOOST_VERSION.tar.bz2 \
         && cd $BOOST_ROOT \
         && SDKROOT="$SDKROOT" ./bootstrap.sh ${BOOTSTRAP_FLAGS} --prefix=$BOOST_ROOT \
