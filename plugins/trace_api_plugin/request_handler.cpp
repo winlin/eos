@@ -47,12 +47,7 @@ namespace {
                ("account", a.account.to_string())
                ("action", a.action.to_string())
                ("authorization", process_authorizations(a.authorization, yield))
-               ("data", fc::to_hex(a.data.data(), a.data.size()));
-
-         auto params = data_handler(a, yield);
-         if (!params.is_null()) {
-            action_variant("params", params);
-         }
+               ("data", a.data);
 
          result.emplace_back( std::move(action_variant) );
       }
@@ -68,8 +63,13 @@ namespace {
          yield();
 
          result.emplace_back(fc::mutable_variant_object()
-            ("id", t.id.str())
-            ("actions", process_actions(t.actions, data_handler, yield))
+             ("transaction_header", t.trx_header)
+             ("status", t.status)
+             ("cpu_usage_us", t.cpu_usage_us)
+             ("net_usage_words", t.net_usage_words)
+             ("id", t.id.str())
+             ("signatures", t.signatures)
+             ("actions", process_actions(t.actions, data_handler, yield))
          );
       }
 

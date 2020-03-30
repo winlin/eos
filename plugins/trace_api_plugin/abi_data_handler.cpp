@@ -8,19 +8,6 @@ namespace eosio::trace_api {
    }
 
    fc::variant abi_data_handler::process_data(const action_trace_v0& action, const yield_function& yield ) {
-      if (abi_serializer_by_account.count(action.account) > 0) {
-         const auto& serializer_p = abi_serializer_by_account.at(action.account);
-         auto type_name = serializer_p->get_action_type(action.action);
-
-         if (!type_name.empty()) {
-            try {
-               return serializer_p->binary_to_variant(type_name, action.data, fc::microseconds::maximum());
-            } catch (...) {
-               except_handler(MAKE_EXCEPTION_WITH_CONTEXT(std::current_exception()));
-            }
-         }
-      }
-
-      return {};
+       return action.data;
    }
 }

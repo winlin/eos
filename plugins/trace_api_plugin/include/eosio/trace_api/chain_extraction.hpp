@@ -2,10 +2,12 @@
 
 #include <eosio/trace_api/common.hpp>
 #include <eosio/trace_api/trace.hpp>
-#include <eosio/trace_api/extract_util.hpp>
 #include <exception>
 #include <functional>
 #include <map>
+#include <eosio/chain_plugin/chain_plugin.hpp>
+#include <eosio/chain/abi_serializer.hpp>
+#include <eosio/chain/block_state.hpp>
 
 namespace eosio { namespace trace_api {
 
@@ -20,10 +22,12 @@ public:
     * @param store provider of append & append_lib
     * @param except_handler called on exceptions, logging if any is left to the user
     */
-   chain_extraction_impl_type( StoreProvider store, exception_handler except_handler )
+   chain_extraction_impl_type( StoreProvider store, exception_handler except_handler)
    : store(std::move(store))
    , except_handler(std::move(except_handler))
    {}
+
+   chain_plugin *chain_plug = nullptr;
 
    /// connect to chain controller applied_transaction signal
    void signal_applied_transaction( const chain::transaction_trace_ptr& trace, const chain::signed_transaction& strx ) {
@@ -63,9 +67,9 @@ private:
       if( is_onblock( trace )) {
          onblock_trace.emplace( trace );
       } else if( trace->failed_dtrx_trace ) {
-         cached_traces[trace->failed_dtrx_trace->id] = trace;
+         cached_traces[trace->failed_dtrx_trace->id] = std::pair{trace, t};
       } else {
-         cached_traces[trace->id] = trace;
+         cached_traces[trace->id] = std::pair{trace, t};
       }
    }
 
@@ -84,7 +88,7 @@ private:
          std::vector<transaction_trace_v0>& traces = bt.transactions;
          traces.reserve( block_state->block->transactions.size() + 1 );
          if( onblock_trace )
-            traces.emplace_back( to_transaction_trace_v0( *onblock_trace ));
+            traces.emplace_back( to_transaction_trace_v0( *onblock_trace));
          for( const auto& r : block_state->block->transactions ) {
             transaction_id_type id;
             if( r.trx.contains<transaction_id_type>()) {
@@ -94,7 +98,7 @@ private:
             }
             const auto it = cached_traces.find( id );
             if( it != cached_traces.end() ) {
-               traces.emplace_back( to_transaction_trace_v0( it->second ));
+               traces.emplace_back( to_transaction_trace_v0( it->second.first, it->second.second));
             }
          }
          cached_traces.clear();
@@ -115,11 +119,84 @@ private:
       }
    }
 
+
+   template<typename T>
+   fc::variant to_variant_with_abi( const T& obj ) {
+      fc::variant pretty_output;
+      auto max_time = chain_plug->get_abi_serializer_max_time();
+      chain::abi_serializer::to_variant(
+              obj,
+              pretty_output,
+              [&]( chain::account_name n ){ return chain_plug->chain().get_abi_serializer(n, max_time); },
+              max_time
+      );
+      return pretty_output;
+   }
+
 private:
-   StoreProvider                                                store;
-   exception_handler                                            except_handler;
-   std::map<transaction_id_type, chain::transaction_trace_ptr>  cached_traces;
-   fc::optional<chain::transaction_trace_ptr>                   onblock_trace;
+   StoreProvider                                                                                      store;
+   exception_handler                                                                                  except_handler;
+   std::map<transaction_id_type, std::pair<chain::transaction_trace_ptr, chain::signed_transaction>>  cached_traces;
+   fc::optional<chain::transaction_trace_ptr>                                                         onblock_trace;
+
+   action_trace_v0 to_action_trace_v0( const chain::action_trace& at ) {
+      action_trace_v0 r;
+      r.receiver = at.receiver;
+      r.account = at.act.account;
+      r.action = at.act.name;
+      r.data = to_variant_with_abi(at)["act"]["data"];
+      if( at.receipt ) {
+         r.global_sequence = at.receipt->global_sequence;
+      }
+      r.authorization.reserve( at.act.authorization.size());
+      for( const auto& auth : at.act.authorization ) {
+         r.authorization.emplace_back( authorization_trace_v0{auth.actor, auth.permission} );
+      }
+      return r;
+   }
+
+/// @return transaction_trace_v0 with populated action_trace_v0
+    transaction_trace_v0 to_transaction_trace_v0( const chain::transaction_trace_ptr& t, const chain::signed_transaction& trx = {}) {
+       transaction_trace_v0 r;
+       if( !t->failed_dtrx_trace ) {
+          r.id = t->id;
+          r.status = t->receipt->status;
+          r.cpu_usage_us = t->receipt->cpu_usage_us;
+          r.net_usage_words = t->receipt->net_usage_words;
+          r.signatures = trx.signatures;
+          r.trx_header = chain::transaction_header{
+              trx.expiration,
+              trx.ref_block_num,
+              trx.ref_block_prefix,
+              trx.max_net_usage_words,
+              trx.max_cpu_usage_ms,
+              trx.delay_sec
+          };
+       } else {
+          r.id = t->failed_dtrx_trace->id; // report the failed trx id since that is the id known to user
+       }
+       r.actions.reserve( t->action_traces.size());
+       for( const auto& at : t->action_traces ) {
+          if( !at.context_free ) { // not including CFA at this time
+             r.actions.emplace_back( to_action_trace_v0( at ));
+          }
+       }
+       return r;
+    }
+
+/// @return block_trace_v0 without any transaction_trace_v0
+    block_trace_v0 create_block_trace_v0( const chain::block_state_ptr& bsp ) {
+       block_trace_v0 r;
+       r.id = bsp->id;
+       r.number = bsp->block_num;
+       r.previous_id = bsp->block->previous;
+       r.timestamp = bsp->block->timestamp;
+       r.producer = bsp->block->producer;
+       r.schedule_version = bsp->block->schedule_version;
+       r.transaction_mroot = bsp->block->transaction_mroot;
+       r.action_mroot = bsp->block->action_mroot;
+       return r;
+    }
 
 };
 

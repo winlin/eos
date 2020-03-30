@@ -164,25 +164,25 @@ struct trace_api_rpc_plugin_impl : public std::enable_shared_from_this<trace_api
          log_exception(e, fc::log_level::debug);
       });
 
-      if( options.count("trace-rpc-abi") ) {
-         EOS_ASSERT(options.count("trace-no-abis") == 0, chain::plugin_config_exception,
-                    "Trace API is configured with ABIs however trace-no-abis is set");
-         const std::vector<std::string> key_value_pairs = options["trace-rpc-abi"].as<std::vector<std::string>>();
-         for (const auto& entry : key_value_pairs) {
-            try {
-               auto kv = parse_kv_pairs(entry);
-               auto account = chain::name(kv.first);
-               auto abi = abi_def_from_file(kv.second, app().data_dir());
-               data_handler->add_abi(account, abi);
-            } catch (...) {
-               elog("Malformed trace-rpc-abi provider: \"${val}\"", ("val", entry));
-               throw;
-            }
-         }
-      } else {
-         EOS_ASSERT(options.count("trace-no-abis") != 0, chain::plugin_config_exception,
-                    "Trace API is not configured with ABIs and trace-no-abis is not set");
-      }
+//      if( options.count("trace-rpc-abi") ) {
+//         EOS_ASSERT(options.count("trace-no-abis") == 0, chain::plugin_config_exception,
+//                    "Trace API is configured with ABIs however trace-no-abis is set");
+//         const std::vector<std::string> key_value_pairs = options["trace-rpc-abi"].as<std::vector<std::string>>();
+//         for (const auto& entry : key_value_pairs) {
+//            try {
+//               auto kv = parse_kv_pairs(entry);
+//               auto account = chain::name(kv.first);
+//               auto abi = abi_def_from_file(kv.second, app().data_dir());
+//               data_handler->add_abi(account, abi);
+//            } catch (...) {
+//               elog("Malformed trace-rpc-abi provider: \"${val}\"", ("val", entry));
+//               throw;
+//            }
+//         }
+//      } else {
+//         EOS_ASSERT(options.count("trace-no-abis") != 0, chain::plugin_config_exception,
+//                    "Trace API is not configured with ABIs and trace-no-abis is not set");
+//      }
 
       req_handler = std::make_shared<request_handler_t>(
          shared_store_provider<store_provider>(common->store),
@@ -263,6 +263,7 @@ struct trace_api_plugin_impl {
 
       auto& chain = app().find_plugin<chain_plugin>()->chain();
 
+      extraction->chain_plug = app().find_plugin<chain_plugin>();
       applied_transaction_connection.emplace(
          chain.applied_transaction.connect([this](std::tuple<const chain::transaction_trace_ptr&, const chain::signed_transaction&> t) {
             emit_killer([&](){
