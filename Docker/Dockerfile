@@ -1,4 +1,4 @@
-FROM winlin/eosbuilder:v2.0.5 as builder
+FROM winlin/eosbuilder:v1.0.2 as builder
 ARG branch=master
 ARG symbol=SYS
 
