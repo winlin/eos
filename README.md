@@ -15,4 +15,4 @@ Just like a toolkit for development. And welcome to make PR to make it stronger.
 ### Features:
 
 - the [Dockerfile](Docker/Dockerfile) for EOSIO.
-- the enhanced [trace-api-plugin](plugins/trace_api_plugin/README.md) supply human readable JSON for every actions.
+- the enhanced [trace-api-plugin](https://github.com/oldcold/trace_api_plugin) supply human readable JSON for every actions.
